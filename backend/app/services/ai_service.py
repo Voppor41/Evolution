@@ -1,3 +1,4 @@
+import json
 import os
 import logging
 from typing import Dict, Any, AsyncGenerator
@@ -18,25 +19,48 @@ class AIService:
             logger.warning("AI api key not found")
             self.client = None
         else:
-            self.client = InferenceClient(self.api_key)
+            try:
+                self.client = InferenceClient(
+                    token=self.api_key,
+                    timeout=30
+                )
+                logger.info("AI service initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize AI client: {e}")
+                self.client = None
 
-    async def generate_quest(self, user_data: Dict[str, Any], stream: bool = False
-                             ) -> AsyncGenerator[str, None] | Dict[str, Any]:
+    async def generate_quest(
+            self,
+            user_data: Dict[str, Any],
+            stream: bool = False
+    ) -> AsyncGenerator[str, None] | Dict[str, Any]:
+        """
+        Генерирует персонализированный квест для пользователя
 
+        Args:
+            user_data: Данные пользователя (уровень, цели, привычки)
+            stream: Режим потоковой генерации
+
+        Returns:
+            Сгенерированный квест в формате JSON или поток данных
+        """
         if not self.client:
+            logger.info("Using fallback quest generation")
             return self._generate_fallback_quest(user_data)
 
-        promt = self._built_quest_promt(user_data)
-
         try:
+            prompt = self._build_quest_prompt(user_data)  # Исправлено _built -> _build
+
             if stream:
-                return self._generate_streaming(promt, user_data)
+                return self._generate_streaming(prompt)
             else:
-                return self._generate_complete(promt, user_data)
+                return await self._generate_complete(prompt)  # Добавлен await
+
         except Exception as e:
             logger.error(f"AI generation error: {e}")
+            return self._generate_fallback_quest(user_data)
 
-    async def _built_quest_promt(self, user_data: Dict[str, Any]) -> str:
+    async def _build_quest_prompt(self, user_data: Dict[str, Any]) -> str:
         return f"""
                 Ты — наставник в RPG-игре о саморазвитии. создай персональный квест для игрока на основе его данных:
                 Уровень: {user_data.get('level', 1)}
@@ -70,69 +94,139 @@ class AIService:
                     "category": "категория"
             }}"""
 
-    async def _generate_complete(self, promt, user_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _generate_complete(self, prompt) -> Dict[str, Any]:
+        try:
+            response = self.client.chat.completions.create(
+                prompt=prompt,
+                model=self.default_model,
+                max_new_tokens=1024,
+                temperature=0.7,
+                top_p=0.9,
+                do_sample=True,
+                return_full_text=False
+            )
+            return self._parse_ai_response(response)
 
-        response = self.client.chat.completions.create(
-            model=self.default_model,
-            messages=[{"role": "user", "content":promt}],
-            max_tokens=1024,
-            temperature=0.7,
-            top_p=0.9
-        )
+        except Exception as e:
+            logger.error(f"AI completion error: {e}")
+            raise
 
-        content = response.choices[0].message.content
-        return self._parse_ai_response(response, content)
 
-    async def _generate_streaming(self, promt, user_data: Dict[str, Any]) -> AsyncGenerator[str, None]:
+    async def _generate_streaming(self, prompt) -> AsyncGenerator[str, None]:
+        try:
+            stream = self.client.chat.completions.create(
+                prompt=prompt,
+                model=self.default_model,
+                max_new_tokens=1024,
+                temperature=0.7,
+                top_p=0.9,
+                do_sample=True,
+                stream=True
+            )
 
-        stream = self.client.chat.completions.create(
-            model=self.default_model,
-            messages=[{"role": "user", "content": promt}],
-            max_tokens=1024,
-            temperature=0.7,
-            top_p=0.9,
-            stream=True
-        )
+            for chunk in stream:
+                if hasattr(chunk, 'text'):
+                    yield chunk.text
+                else:
+                    yield str(chunk)
 
-        for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta_content:
-                yield chunk.choices[0].delta_content
+        except Exception as e:
+            logger.info(f"AI streaming generate error: {e}")
+            yield json.dumps(self._generate_fallback_quest({}))
+
+
+    def _parse_ai_response(self, response: str) -> Dict[str, Any]:
+
+        try:
+            cleaned_response = response.strip()
+
+            start_idx = cleaned_response.find('{')
+            end_idx = cleaned_response.find('}') + 1
+
+            if start_idx != -1 and end_idx != 0:
+                json_str = cleaned_response[start_idx:end_idx]
+                quest_data = json.loads(json_str)
+
+                required_field = ['title', 'description', 'steps', 'difficulty', 'category']
+                if all(field in quest_data for field in required_field):
+                    return quest_data
+
+            logger.warning("AI response parsing failed, using fallback")
+            return self._generate_fallback_quest({})
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error: {e}, response:{response}")
+            return self._generate_fallback_quest({})
 
     def _generate_fallback_quest(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Резервная генерация квеста (если AI недоступен"""
-
+        """Резервная генерация квеста если AI недоступен"""
         goals = user_data.get('goals', [])
+        level = user_data.get('level', 1)
 
-        # Простая логика на основе целей пользователя
-        if any('здор' in goal.lower() for goal in goals):
+        # Более интеллектуальный fallback на основе целей
+        goal_text = ' '.join(goals).lower() if goals else ''
+
+        if any(word in goal_text for word in ['здор', 'спорт', 'фитнес', 'трениров']):
             return {
                 "title": "Путь к здоровому образу жизни",
-                "description": "7-дневный челлендж для улучшения здоровья",
+                "description": "Начни свое путешествие к улучшению здоровья и физической формы",
                 "steps": [
                     {
-                        "title": "Утренняя зарядка 15 минут",
-                        "description": "Выполни комплекс утренних упражнений",
+                        "title": "Утренняя энергия",
+                        "description": "Выполни 15-минутную утреннюю зарядку",
                         "points": 25,
                         "estimated_time": "15 минут"
+                    },
+                    {
+                        "title": "Водный баланс",
+                        "description": "Выпей 2 литра воды в течение дня",
+                        "points": 20,
+                        "estimated_time": "Весь день"
+                    },
+                    {
+                        "title": "Здоровый перекус",
+                        "description": "Замени один вредный перекус на фрукты или овощи",
+                        "points": 15,
+                        "estimated_time": "5 минут"
                     }
                 ],
-                "estimated_time": "7 дней",
-                "difficulty": "medium",
-                "category": "health"
+                "total_points": 60,
+                "difficulty": "easy",
+                "category": "health",
+                "duration": "1 день"
+            }
+        elif any(word in goal_text for word in ['уч', 'обуч', 'книг', 'чтение']):
+            return {
+                "title": "Квест знаний",
+                "description": "Открой для себя новые горизонты обучения",
+                "steps": [
+                    {
+                        "title": "Чтение на развитие",
+                        "description": "Прочитай одну главу из образовательной книги",
+                        "points": 30,
+                        "estimated_time": "30 минут"
+                    }
+                ],
+                "total_points": 30,
+                "difficulty": "easy",
+                "category": "learning",
+                "duration": "1 день"
             }
 
+        # Базовый квест по умолчанию
         return {
-            "title": "Базовый квест продуктивности",
-            "description": "Начни свой путь к эффективности",
+            "title": "Начало пути героя",
+            "description": "Сделай первый шаг к своим целям",
             "steps": [
                 {
                     "title": "Планирование дня",
-                    "description": "Составь план на день",
+                    "description": "Составь план на сегодня и выдели 3 главные задачи",
                     "points": 30,
                     "estimated_time": "10 минут"
                 }
             ],
-            "estimated_time": "1 день",
+            "total_points": 30,
             "difficulty": "easy",
-            "category": "productivity"
+            "category": "productivity",
+            "duration": "1 день"
         }
