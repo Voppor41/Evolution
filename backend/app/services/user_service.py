@@ -4,8 +4,8 @@ from typing import List, Optional
 from datetime import datetime, timezone
 import logging
 
-from ..database.models import GeneratedQuest, UserQuest, Player
-from ai_service import AIService
+from database.models import GeneratedQuest, UserQuest, Player
+from .ai_service import AIService
 
 logger = logging.getLogger(__name__)
 

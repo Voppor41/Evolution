@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List
 import logging
 
-from ..database.db import get_db
-from ..services.user_service import UserService
-from ..database.schemas import PlayerCreate, PlayerUpdate, PlayerResponse
+from database.db import get_db
+from services.user_service import UserService
+from database.schemas import PlayerCreate, PlayerResponse, PlayerUpdate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/players", tags=["players"])

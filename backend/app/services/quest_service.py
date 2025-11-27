@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 import logging
 import json
 
-from ..database.models import Player, GeneratedQuest, UserQuest
-from ai_service import AIService
+from database.models import Player, GeneratedQuest, UserQuest
+from .ai_service import AIService
 
 logger = logging.getLogger(__name__)
 

@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import logging
 
-from ..database.db import get_db
-from ..services.quest_service import QuestService
-from ..services.user_service import UserService
-from ..database.schemas import QuestResponse, QuestCreate
+from database.db import get_db
+from services.quest_service import QuestService
+from services.user_service import UserService
+from database.schemas import QuestResponse, QuestCreate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/quests", tags=["quests"])
