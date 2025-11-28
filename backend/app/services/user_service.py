@@ -13,7 +13,12 @@ class UserService:
 
     def __init__(self, db:Session):
         self.db = db
-        self.ai_service = AIService()
+        try:
+            self.ai_service = AIService()
+            logger.info("AI service initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initialized AI service: {e}")
+            self.ai_service = None
 
     async def create_player(self, username: str, email:str, password:str, goals: list=None) -> Player:
         try:

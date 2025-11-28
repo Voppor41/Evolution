@@ -18,7 +18,7 @@ def get_user_service(db: Session = Depends(get_db)) -> UserService:
 
 @router.post("/generate/{player_id}", response_model=QuestResponse)
 async def generate_quest(player_id: int,
-                         quest_service: QuestService = Depends(get_user_service),
+                         quest_service: QuestService = Depends(get_quest_service),
                          user_service: UserService = Depends(get_user_service)):
 
     try:

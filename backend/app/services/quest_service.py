@@ -14,7 +14,12 @@ class QuestService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.ai_service = AIService
+        try:
+            self.ai_service = AIService()
+            logger.info("AI service initialized successfully in QuestService")
+        except Exception as e:
+            logger.error(f"Failed initialized AI service: {e}")
+            self.ai_service = None
 
     async def generate_quest_for_player(self, player_id: int) -> UserQuest:
 
@@ -23,6 +28,10 @@ class QuestService:
 
             if not player:
                 raise ValueError(f"Player with this id: {player_id} not found")
+
+            if not self.ai_service or not hasattr(self.ai_service, 'generate_quest'):
+                logger.warning("AI service not available, using fallback")
+                return await self._create_fallback_quest(player_id)
 
             user_data = {
                 'level': player.level,
@@ -33,23 +42,24 @@ class QuestService:
 
             quest_data = await self.ai_service.generate_quest(user_data)
 
+            # Сохраняем сгенерированный шаблон квеста
             generated_quest = GeneratedQuest(
                 title=quest_data["title"],
                 description=quest_data["description"],
-                steps=json.dumps(quest_data["steps"]),  # Сохраняем как JSON строку
+                steps=json.dumps(quest_data["steps"]),
                 estimated_time=quest_data.get("estimated_time"),
                 difficulty=quest_data["difficulty"],
                 category=quest_data.get("category", "general"),
                 total_points=quest_data.get("total_points", 0),
                 ai_generated=True,
-                player_id=player_id,
-                ai_model=self.ai_service.default_model
+                player_id=player_id
             )
 
             self.db.add(generated_quest)
             self.db.commit()
             self.db.refresh(generated_quest)
 
+            # Создаем персональный квест для игрока
             user_quest = UserQuest(
                 title=quest_data["title"],
                 description=quest_data["description"],
@@ -64,9 +74,34 @@ class QuestService:
 
             logger.info(f"Generated quest '{quest_data['title']}' for player {player_id}")
             return user_quest
+
         except Exception as e:
             self.db.rollback()
             logger.error(f"Error generating quest for player {player_id}: {e}")
+            # Используем fallback в случае ошибки
+            return await self._create_fallback_quest(player_id)
+
+    async def _create_fallback_quest(self, player_id: int) -> UserQuest:
+        """Создание резервного квеста если AI недоступен"""
+        try:
+            # Простой fallback квест
+            user_quest = UserQuest(
+                title="Базовый квест продуктивности",
+                description="Начни свой путь к эффективности",
+                points=30,
+                player_id=player_id
+            )
+
+            self.db.add(user_quest)
+            self.db.commit()
+            self.db.refresh(user_quest)
+
+            logger.info(f"Created fallback quest for player {player_id}")
+            return user_quest
+
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error creating fallback quest: {e}")
             raise
 
     async def create_manual_quest(self, player_id: int, quest_data: Dict[str, Any]) -> UserQuest:
