@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class AIService:
 
     def __init__(self):
-        self.api_key = os.getenv("HUGGINGFACE_API_KEY")
+        self.api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
         self.default_model = os.getenv("AI_MODEL")
 
         if not self.api_key:

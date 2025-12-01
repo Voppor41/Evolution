@@ -18,25 +18,26 @@ class Player(Base):
     experience = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
-    registered_at = Column(DateTime, default=datetime.now(timezone.utc))
+    registered_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     ai_settings = Column(JSON, default={"enable": True, "model": "Qwen2.5-7B-Instruct"})
 
-    generated_quests = relationship("GeneratedQuest", back_populates="player")
-    user_quests = relationship("UserQuest", back_populates="player")
 
-    def add_experience(self, points:int):
+    user_quests = relationship("UserQuest", back_populates="player")
+    generated_quests = relationship("GeneratedQuest", back_populates="player")
+
+    def add_experience(self, points: int):
         self.experience += points
         self.check_level_up()
 
     def check_level_up(self):
         exp_needed = self.level ** 2 * 100
-        while exp_needed <= self.experience:
+        while self.experience >= exp_needed:
             self.level += 1
             self.experience -= exp_needed
             exp_needed = self.level ** 2 * 100
 
 class GeneratedQuest(Base):
-    __tablename__ = "generated_quest"
+    __tablename__ = "generated_quests"
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
@@ -47,27 +48,30 @@ class GeneratedQuest(Base):
     category = Column(String)
     total_points = Column(Integer)
     ai_generated = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     ai_model = Column(String, nullable=True)
     generation_prompt = Column(Text, nullable=True)
 
+
     player_id = Column(Integer, ForeignKey("players.id"))
-    player = relationship("Player", back_populates="generated_quest")
-    quest = relationship("UserQuest", back_populates="generated_quest")
+    player = relationship("Player", back_populates="generated_quests")
+
+    user_quests = relationship("UserQuest", back_populates="generated_quest")
 
 class UserQuest(Base):
-    __tablename__ = "user_quest"
+    __tablename__ = "user_quests"
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
-    description = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
     points = Column(Integer, default=0)
     is_completed = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime, nullable=True)
 
-    user_id = Column(Integer, ForeignKey("players.id"))
-    user = relationship("Player", back_populates="user_quest")
 
-    quest_id = Column(Integer, ForeignKey("generated_quest.id"), nullable=True)
-    quest = relationship("GeneratedQuest", back_populates="user_quest")
+    player_id = Column(Integer, ForeignKey("players.id"))
+    player = relationship("Player", back_populates="user_quests")
+
+    generated_quest_id = Column(Integer, ForeignKey("generated_quests.id"), nullable=True)
+    generated_quest = relationship("GeneratedQuest", back_populates="user_quests")
