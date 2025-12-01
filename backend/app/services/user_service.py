@@ -1,11 +1,14 @@
 import asyncio
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
 import logging
+import bcrypt
 
 from database.models import GeneratedQuest, UserQuest, Player
 from .ai_service import AIService
+from .auth_service import create_access_token
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +30,14 @@ class UserService:
             if existing_user:
                 raise ValueError("This username or email already exist")
 
+            salt = bcrypt.gensalt()
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+            hashed_password_str = hashed_password.decode('utf-8')
+
             player = Player(
                 username=username,
                 email=email,
-                hashed_password=password,
+                hashed_password=hashed_password_str,
                 goals=goals or [],
                 level=1,
                 experience=0
@@ -46,6 +53,32 @@ class UserService:
             self.db.rollback()
             logger.error(f"Error creating player: {e}")
             raise
+
+    async def login_player(self, username:str, password:str) -> Player:
+        try:
+            player = self.db.query(Player).filter(Player.username == username)
+            token = create_access_token(data={"sub": player.username, "id": player.id})
+            if not player:
+                logger.warning(f"Username isn't exist: {username}")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Uncorrected username or password")
+
+            hashed_password_bytes = player.hashed_password.encode('utf-8')
+
+            if not bcrypt.checkpw(password.encode('utf-8'), hashed_password_bytes):
+                logger.warning("Uncorrected password")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Uncorrected username or password")
+
+            logger.info(f"Successful login: {username}, (ID: {player.id})")
+            return player, token
+
+        except HTTPException:
+            raise
+
+        except Exception as e:
+            logger.error(f"Ошибка при аутентификации: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутренняя ошибка сервера")
+
 
     async def get_player_by_id(self, player_id: int) -> Optional[Player]:
         return self.db.query(Player).filter(Player.id == player_id).first()
