@@ -29,6 +29,16 @@ async def create_player(player_data: PlayerCreate, user_service: UserService = D
         logger.error(f"Error creating player: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Iternal server error")
 
+@router.post("/login", response_model=PlayerResponse)
+async def login_player(login_data: PlayerLogin, user_service: UserService = Depends(get_user_service)):
+
+    player = await user_service.login_player(
+        username=login_data.username,
+        password=login_data.password
+    )
+
+    return player
+
 @router.get("/{player_id}", response_model=PlayerResponse)
 async def get_player(player_id: int, user_service: UserService = Depends(get_user_service)):
 
