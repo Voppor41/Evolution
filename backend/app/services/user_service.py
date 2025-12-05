@@ -8,6 +8,7 @@ import bcrypt
 
 from database.models import GeneratedQuest, UserQuest, Player
 from .ai_service import AIService
+from .auth_service import AuthService
 from .auth_service import create_access_token
 
 logger = logging.getLogger(__name__)
@@ -56,28 +57,43 @@ class UserService:
 
     async def login_player(self, username:str, password:str) -> Player:
         try:
-            player = self.db.query(Player).filter(Player.username == username)
-            token = create_access_token(data={"sub": player.username, "id": player.id})
+            player = self.db.query(Player).filter(Player.username == username).first()
+
             if not player:
-                logger.warning(f"Username isn't exist: {username}")
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Uncorrected username or password")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Неверное имя пользователя или пароль"
+                )
 
-            hashed_password_bytes = player.hashed_password.encode('utf-8')
+            # Проверяем пароль (если используете bcrypt напрямую)
+            import bcrypt
+            if not bcrypt.checkpw(password.encode('utf-8'), player.hashed_password.encode('utf-8')):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Неверное имя пользователя или пароль"
+                )
 
-            if not bcrypt.checkpw(password.encode('utf-8'), hashed_password_bytes):
-                logger.warning("Uncorrected password")
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Uncorrected username or password")
+            # Создаем JWT токен
+            access_token = AuthService.create_access_token(
+                data={"sub": player.username, "id": player.id}
+            )
 
-            logger.info(f"Successful login: {username}, (ID: {player.id})")
-            return player, token
+            logger.info(f"Успешный вход пользователя: {username}")
+
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "player": player
+            }
 
         except HTTPException:
             raise
-
         except Exception as e:
             logger.error(f"Ошибка при аутентификации: {e}")
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутренняя ошибка сервера")
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Внутренняя ошибка сервера"
+            )
 
 
     async def get_player_by_id(self, player_id: int) -> Optional[Player]:
