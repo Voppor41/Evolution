@@ -7,8 +7,13 @@ class PlayerBase(BaseModel):
     email: EmailStr
     goals: List[str] = Dict
 
-class PlayerCreate(PlayerBase):
+class PlayerLogin(BaseModel):
+    username:str
     password: str
+
+class PlayerCreate(BaseModel):
+    email: str
+    goals: List[str] = Dict
 
 class PlayerUpdate(BaseModel):
     goals: List[str]

@@ -5,7 +5,8 @@ import logging
 
 from database.db import get_db
 from services.user_service import UserService
-from database.schemas import Player,  PlayerCreate, PlayerResponse, PlayerUpdate
+from database.schemas import PlayerCreate, PlayerResponse, PlayerUpdate, PlayerLogin
+from database.models import Player
 from dependencies.auth import get_current_user, get_current_active_user
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ async def create_player(player_data: PlayerCreate, user_service: UserService = D
 @router.get("/me", response_model=PlayerResponse)
 async def get_me(current_user: Player = Depends(get_current_user)):
     return current_user
+
 @router.put("/me/update", response_model=PlayerResponse)
 async def update_profile(
         update_player: PlayerUpdate,
