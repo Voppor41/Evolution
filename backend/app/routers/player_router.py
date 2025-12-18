@@ -5,7 +5,7 @@ import logging
 
 from database.db import get_db
 from services.user_service import UserService
-from database.schemas import PlayerCreate, PlayerResponse, PlayerUpdate
+from database.schemas import Player,  PlayerCreate, PlayerResponse, PlayerUpdate
 from dependencies.auth import get_current_user, get_current_active_user
 
 logger = logging.getLogger(__name__)

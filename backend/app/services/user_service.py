@@ -9,7 +9,7 @@ import bcrypt
 from database.models import GeneratedQuest, UserQuest, Player
 from .ai_service import AIService
 from .auth_service import AuthService
-from .auth_service import create_access_token
+
 
 logger = logging.getLogger(__name__)
 
