@@ -52,3 +52,14 @@ class QuestGenerationResponse(BaseModel):
     quest: QuestResponse
     generated_quest_id: Optional[int]
     ai_generated: bool
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+class PlayerLogin(BaseModel):
+    username: str
+    password: str
