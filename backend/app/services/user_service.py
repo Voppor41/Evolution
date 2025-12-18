@@ -57,7 +57,7 @@ class UserService:
 
     async def login_player(self, username:str, password:str) -> Player:
         try:
-            player = self.db.query(Player).filter(Player.username == username).first()
+            player = await self.authenticate_player(username, password)
 
             if not player:
                 raise HTTPException(
