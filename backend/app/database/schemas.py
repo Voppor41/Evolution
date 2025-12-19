@@ -64,7 +64,3 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
-
-class PlayerLogin(BaseModel):
-    username: str
-    password: str
