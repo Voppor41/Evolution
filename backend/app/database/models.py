@@ -71,3 +71,28 @@ class UserQuest(Base):
 
     quest_id = Column(Integer, ForeignKey("generated_quest.id"), nullable=True)
     quest = relationship("GeneratedQuest", back_populates="user_quest")
+
+class PlayerStats(Base):
+    __tablename__ = "player_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    player_id = Column(Integer, ForeignKey("players.id"), unique=True)
+
+    # Статистика
+    total_quests_completed = Column(Integer, default=0)
+    total_experience_earned = Column(Integer, default=0)
+    total_days_active = Column(Integer, default=1)
+    last_active_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Категории квестов
+    health_quests_completed = Column(Integer, default=0)
+    learning_quests_completed = Column(Integer, default=0)
+    productivity_quests_completed = Column(Integer, default=0)
+    creativity_quests_completed = Column(Integer, default=0)
+    sports_quests_completed = Column(Integer, default=0)
+
+    # Рекорды
+    longest_streak = Column(Integer, default=0)  # дней подряд
+    current_streak = Column(Integer, default=0)
+
+    player = relationship("Player", back_populates="stats")
