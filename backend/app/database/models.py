@@ -21,8 +21,14 @@ class Player(Base):
     registered_at = Column(DateTime, default=datetime.now(timezone.utc))
     ai_settings = Column(JSON, default={"enable": True, "model": "Qwen2.5-7B-Instruct"})
 
+    stats = relationship("PlayerStats", back_populates="player", uselist=False, cascade="all_delete-orphan")
+
     generated_quests = relationship("GeneratedQuest", back_populates="player")
     user_quests = relationship("UserQuest", back_populates="player")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.stats = PlayerStats()
 
     def add_experience(self, points:int):
         self.experience += points
