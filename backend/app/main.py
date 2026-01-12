@@ -8,6 +8,7 @@ from database.db import engine, Base
 from database import models
 from routers.player_router import router as player_router
 from routers.quest_router import router as quest_router
+from routers.dashboard_router import router as dashboard_router
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -36,6 +37,7 @@ app.add_middleware(
 # Подключение роутеров
 app.include_router(player_router)
 app.include_router(quest_router)
+app.include_router(dashboard_router)
 
 @app.get("/")
 async def root():
