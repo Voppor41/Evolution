@@ -7,6 +7,7 @@ import json
 
 from database.models import Player, GeneratedQuest, UserQuest
 from .ai_service import AIService
+from .stats_service import StatsService
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ class QuestService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.stats_service = StatsService(db)
         try:
             self.ai_service = AIService()
             logger.info("AI service initialized successfully in QuestService")
@@ -142,6 +144,8 @@ class QuestService:
             # Начисляем опыт игроку
             player = quest.player
             player.add_experience(quest.points)
+
+            await self.stats_service.update_stats_on_quest_complete(player.id, quest)
 
             self.db.commit()
             self.db.refresh(player)
